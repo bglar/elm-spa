@@ -39,12 +39,13 @@ type alias Model =
     password: String,
     token: String,
     quote : String, -- Just have the quote before authentication
+    protectedQuote : String,
     errorMsg: String
   }
 
 init : () -> (Model, Cmd Msg)
 init _ =
-  ( Model "" "" "" "" ""
+  ( Model "" "" "" "" "" ""
   -- , Cmd.none
   , fetchRandomQuoteCmd
   )
@@ -76,6 +77,10 @@ registerUrl =
 loginUrl : String
 loginUrl =
     api ++ "sessions/create"
+
+protectedQuoteUrl : String
+protectedQuoteUrl = 
+    api ++ "api/protected/random-quote"
 
 -- Encode user to construct POST request body (for Register and Log In)
 {-
@@ -148,6 +153,32 @@ fetchRandomQuoteCompleted model result =
       Err _ ->
         ( model, Cmd.none )
 
+fetchProtectedQuote : Model -> Http.Request String
+fetchProtectedQuote model = 
+  {
+    method = "GET"
+  , headers = [ Http.header "Authorization" ("Bearer " ++ model.token) ]
+  , url = protectedQuoteUrl
+  , body = Http.emptyBody
+  , expect = Http.expectString
+  , timeout = Nothing
+  , withCredentials = False
+  } |> Http.request
+
+fetchProtectedQuoteCmd : Model -> Cmd Msg
+fetchProtectedQuoteCmd model =
+    Http.send FetchProtectedQuoteCompleted (fetchProtectedQuote model)
+
+
+fetchProtectedQuoteCompleted : Model -> Result Http.Error String -> ( Model, Cmd Msg )
+fetchProtectedQuoteCompleted model result =
+    case result of
+        Ok newQuote ->
+            ( { model | protectedQuote = newQuote }, Cmd.none )
+
+        Err _ ->
+            ( model, Cmd.none )
+
 -- Messages 
 type Msg 
   = GetQuote -- Custom/Union type
@@ -158,6 +189,8 @@ type Msg
   | ClickLogin
   | LogOut
   | GetTokenCompleted (Result Http.Error String)
+  | GetProtectedQuote
+  | FetchProtectedQuoteCompleted (Result Http.Error String)
 
 -- Update
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -201,6 +234,12 @@ update msg model =
     LogOut -> 
       ( { model | username = "", token = ""}, Cmd.none )
 
+    GetProtectedQuote ->
+          ( model, fetchProtectedQuoteCmd model )
+
+    FetchProtectedQuoteCompleted result ->
+        fetchProtectedQuoteCompleted model result  
+
 ----------------
 -- VIEW
 ----------------
@@ -243,9 +282,8 @@ view model =
                       text "You have super-secret access to protected quotes." ]
                     , p [ class "text-center" ] [
                       button [ class "btn btn-danger", onClick LogOut ] [
-                        text "Log Out"
+                        text "Log Out" ]
                       ]
-                    ]
                     ]
             else
                 div [ id "form" ]
@@ -285,20 +323,50 @@ view model =
                           text "Register" ]
                         ]
                     ]
+    protectedQuoteView =
+      let
+        -- If no protected quote, apply a class of "hidden"
+        hideIfNoProtectedQuote : String
+        hideIfNoProtectedQuote =
+            if String.isEmpty model.protectedQuote then
+                "hidden"
+            else
+                "help-block"
+      in
+        if loggedIn then
+          div []
+            [ p [ class "text-center" ]
+                [ button [ class "btn btn-info", onClick GetProtectedQuote ] [ 
+                  text "Grab a protected quote!" ]
+                ]
+              -- Blockquote with protected quote: only show if a 
+              -- protectedQuote is present in model
+            , blockquote [ class hideIfNoProtectedQuote ]
+                [ p [] [ text model.protectedQuote ]
+                ]
+              ]
+        else
+            p [ class "text-center" ] [ 
+              text """
+              Please log in or register to see protected quotes.
+              """ ]
   in
     div [ class "container" ] [
       h2 [ class "text-center" ] [ text "Chuck Norris Quotes" ]
       , p [ class "text-center" ] [
         button [ class "btn btn-success", onClick GetQuote ] [ 
-          text "Grab a quote!"  
-        ]
+          text "Grab a quote!" ]
       ]
-        -- Blockquote with quote
-        , blockquote [ class "help-block" ] [
-            p [] [text model.quote]
-        ]
-        , div [ class "jumbotron text-left" ] [ 
-            -- Login/Register form or user greeting
-            authBoxView
-        ]
+      -- Blockquote with quote
+      , blockquote [ class "help-block" ] [
+          p [] [text model.quote]
+      ]
+      , div [ class "jumbotron text-left" ] [ 
+          -- Login/Register form or user greeting
+        authBoxView
+      ]
+      , div [] [
+        h2 [ class "text-center" ] [ text "Protected Chuck Norris Quotes"]
+        ,  protectedQuoteView
+      ]
     ]
