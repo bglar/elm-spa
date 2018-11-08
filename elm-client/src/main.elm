@@ -1,4 +1,6 @@
 -- Import dependencies at the top level of the file
+port module Main exposing (..)
+
 import Browser
 import Http
 import Html exposing (..)
@@ -96,6 +98,12 @@ userEncoder model =
         , ("password", Encode.string model.password) 
         ]          
 
+-- Helper to update model and set localStorage with the updated model
+setStorageHelper : Model -> ( Model, Cmd Msg )
+setStorageHelper model =
+    ( model, setStorage model )
+
+
 -- POST register / login request
 {-
 Create an effect function authUser (for "authenticate a user"). 
@@ -122,10 +130,9 @@ getTokenCompleted : Model -> Result Http.Error String -> ( Model, Cmd Msg )
 getTokenCompleted model result = 
   case result of
       Ok newToken ->
-        ( { model | token = newToken, password = "", errorMsg = "" 
+        setStorageHelper { model | token = newToken, password = "", errorMsg = "" 
           } 
-          |> Debug.log "got new token", Cmd.none 
-        )
+          -- |> Debug.log "got new token"
   
       Err error ->
         ( { model | errorMsg = (Debug.toString error) }, Cmd.none )
@@ -148,7 +155,7 @@ fetchRandomQuoteCompleted : Model -> Result Http.Error String -> ( Model, Cmd Ms
 fetchRandomQuoteCompleted model result = 
   case result of
       Ok newQuote ->
-        ( { model | quote = newQuote }, Cmd.none )
+        setStorageHelper { model | quote = newQuote }
   
       Err _ ->
         ( model, Cmd.none )
@@ -174,10 +181,15 @@ fetchProtectedQuoteCompleted : Model -> Result Http.Error String -> ( Model, Cmd
 fetchProtectedQuoteCompleted model result =
     case result of
         Ok newQuote ->
-            ( { model | protectedQuote = newQuote }, Cmd.none )
+            setStorageHelper { model | protectedQuote = newQuote }
 
         Err _ ->
             ( model, Cmd.none )
+
+-- Ports
+
+port setStorage : Model -> Cmd msg
+port removeStorage : Model -> Cmd msg
 
 -- Messages 
 type Msg 
@@ -232,7 +244,7 @@ update msg model =
     -- errorMsg because we already did so when we successfully 
     -- retrieved a token in GetTokenCompleted.
     LogOut -> 
-      ( { model | username = "", token = ""}, Cmd.none )
+      ( { model | username = "", token = ""}, removeStorage model )
 
     GetProtectedQuote ->
           ( model, fetchProtectedQuoteCmd model )

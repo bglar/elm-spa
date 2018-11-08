@@ -14,9 +14,25 @@
     <div id="elm"></div>
 
     <script>
+        // Establish the startingState in a ternary that checks storedState 
+        // for model data. If data is found JSON.parse it and pass it to our 
+        // Elm app. If there is no model yet, we'll pass null
+        // var storedState = localStorage.getItem('model');
+        // var startingState = storedState ? JSON.parse(storedState) : null;
+
         var app = Elm.Main.init({
             node: document.getElementById("elm")
-        })
+        });
+
+        // Set up ports so we can use features of localStorage in our Elm code.
+        app.ports.setStorage.subscribe(function(state) {
+            localStorage.setItem('model', JSON.stringify(state));
+        });
+        
+        app.ports.removeStorage.subscribe(function() {
+            localStorage.removeItem('model');
+        });
+
     </script>
 </body>
 
